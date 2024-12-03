@@ -90,6 +90,9 @@ DynInst::DynInst(const Arrays &arrays, const StaticInstPtr &static_inst,
     cpu->snList.insert(seqNum);
 #endif
 
+    // 预分配父指令和祖父指令容器的空间
+    parentInsts.reserve(_numSrcs);
+    grandparentInsts.reserve(_numSrcs);
 }
 
 DynInst::DynInst(const Arrays &arrays, const StaticInstPtr &static_inst,
@@ -453,6 +456,34 @@ DynInst::initiateMemAMO(Addr addr, unsigned size, Request::Flags flags,
             dynamic_cast<DynInstPtr::PtrType>(this),
             /* atomic */ false, nullptr, size, addr, flags, nullptr,
             std::move(amo_op), std::vector<bool>(size, true));
+}
+
+void
+DynInst::setParentInst(int src_idx, DynInstPtr parent)
+{
+    if (src_idx >= parentInsts.size())
+        parentInsts.resize(src_idx + 1);
+    parentInsts[src_idx] = parent;
+}
+
+void
+DynInst::setGrandparentInst(int src_idx, DynInstPtr grandparent)
+{
+    if (src_idx >= grandparentInsts.size())
+        grandparentInsts.resize(src_idx + 1);
+    grandparentInsts[src_idx] = grandparent;
+}
+
+DynInstPtr
+DynInst::getParentInst(int src_idx) const
+{
+    return (src_idx < parentInsts.size()) ? parentInsts[src_idx] : nullptr;
+}
+
+DynInstPtr
+DynInst::getGrandparentInst(int src_idx) const
+{
+    return (src_idx < grandparentInsts.size()) ? grandparentInsts[src_idx] : nullptr;
 }
 
 } // namespace o3

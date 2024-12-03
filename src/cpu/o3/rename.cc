@@ -86,6 +86,8 @@ Rename::Rename(CPU *_cpu, const BaseO3CPUParams &params)
         serializeInst[tid] = nullptr;
         serializeOnNextInst[tid] = false;
     }
+
+    producerMap.resize(numThreads);
 }
 
 std::string
@@ -957,6 +959,15 @@ Rename::doSquash(const InstSeqNum &squashed_seq_num, ThreadID tid)
 
         ++stats.undoneMaps;
     }
+
+    // 清理被squash指令的生产者信息
+    for (auto it = producerMap[tid].begin(); it != producerMap[tid].end();) {
+        if (it->second.producer->seqNum > squashed_seq_num) {
+            it = producerMap[tid].erase(it);
+        } else {
+            ++it;
+        }
+    }
 }
 
 void
@@ -1005,6 +1016,15 @@ Rename::removeFromHistory(InstSeqNum inst_seq_num, ThreadID tid)
         ++stats.committedMaps;
 
         historyBuffer[tid].erase(hb_it--);
+    }
+
+    // 清理已提交指令的生产者信息
+    for (auto it = producerMap[tid].begin(); it != producerMap[tid].end();) {
+        if (it->second.producer->seqNum <= inst_seq_num) {
+            it = producerMap[tid].erase(it);
+        } else {
+            ++it;
+        }
     }
 }
 
@@ -1059,6 +1079,23 @@ Rename::renameSrcRegs(const DynInstPtr &inst, ThreadID tid)
                 renamed_reg->className());
 
         inst->renameSrcReg(src_idx, renamed_reg);
+
+        // 添加父指令和祖父指令跟踪
+        auto producer_it = producerMap[tid].find(renamed_reg);
+        if (producer_it != producerMap[tid].end()) {
+            DynInstPtr parent = producer_it->second.producer;
+            inst->setParentInst(src_idx, parent);
+
+            // 获取第一个祖父指令
+            if (!producer_it->second.sourceDependencies.empty()) {
+                auto grandparent_it = producerMap[tid].find(
+                    producer_it->second.sourceDependencies.front());
+                if (grandparent_it != producerMap[tid].end()) {
+                    inst->setGrandparentInst(src_idx,
+                                           grandparent_it->second.producer);
+                }
+            }
+        }
 
         // See if the register is ready or not.
         if (scoreboard->getReg(renamed_reg)) {
@@ -1132,6 +1169,18 @@ Rename::renameDestRegs(const DynInstPtr &inst, ThreadID tid)
                             rename_result.second);
 
         ++stats.renamedOperands;
+
+        // 更新生产者信息
+        ProducerInfo producer_info;
+        producer_info.producer = inst;
+
+        // 收集该指令的所有源寄存器
+        for (int src_idx = 0; src_idx < inst->numSrcRegs(); src_idx++) {
+            producer_info.sourceDependencies.push_back(
+                inst->renamedSrcIdx(src_idx));
+        }
+
+        producerMap[tid][rename_result.first] = producer_info;
     }
 }
 

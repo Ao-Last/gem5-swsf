@@ -44,6 +44,7 @@
 
 #include <list>
 #include <utility>
+#include <unordered_map>
 
 #include "base/statistics.hh"
 #include "cpu/o3/comm.hh"
@@ -537,6 +538,15 @@ class Rename
         /** Number of instructions inserted into skid buffers. */
         statistics::Scalar skidInsts;
     } stats;
+
+    // 用于跟踪每个物理寄存器的生产者指令
+    struct ProducerInfo {
+        DynInstPtr producer;     // 生产该值的指令
+        std::vector<PhysRegIdPtr> sourceDependencies;  // 该指令的源寄存器
+    };
+
+    // 每个线程一个映射表
+    std::vector<std::unordered_map<PhysRegIdPtr, ProducerInfo>> producerMap;
 };
 
 } // namespace o3

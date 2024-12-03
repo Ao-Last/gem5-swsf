@@ -1156,6 +1156,22 @@ class DynInst : public ExecContext, public RefCounted
         cpu->setReg(reg, val, threadNumber);
         setResult(reg->regClass(), val);
     }
+
+    // 每个源寄存器的父指令和祖父指令
+    std::vector<DynInstPtr> parentInsts;
+    std::vector<DynInstPtr> grandparentInsts;  // 只保存第一个祖父指令
+
+    // 设置源寄存器的父指令
+    void setParentInst(int src_idx, DynInstPtr parent);
+
+    // 设置源寄存器的祖父指令(只保存第一个)
+    void setGrandparentInst(int src_idx, DynInstPtr grandparent);
+
+    // 获取源寄存器的父指令
+    DynInstPtr getParentInst(int src_idx) const;
+
+    // 获取源寄存器的祖父指令
+    DynInstPtr getGrandparentInst(int src_idx) const;
 };
 
 } // namespace o3
